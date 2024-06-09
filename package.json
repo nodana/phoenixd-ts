@@ -1,0 +1,51 @@
+{
+  "name": "@nodana/phoenixd-ts",
+  "version": "0.1.0",
+  "description": "A TypeScript client for Phoenixd Lightning nodes",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nodana/phoenixd-ts.git"
+  },
+  "homepage": "https://github.com/nodana/phoenixd-ts#readme",
+  "main": "dist/cjs/index.js",
+  "module": "dist/es6/index.js",
+  "types": "dist/es6/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/es6/index.d.ts",
+      "import": "./dist/es6/index.js",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "clean": "rimraf dist",
+    "build:cjs": "tsc",
+    "build:es6": "tsc -p tsconfig.es6.json",
+    "build": "run-s clean && run-p build:*",
+    "prepublishOnly": "run-s test build",
+    "test": "mocha -r ts-node/register 'tests/**/*.ts'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/chai": "^4.3.16",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.14.2",
+    "@types/sinon": "^17.0.3",
+    "@types/sinon-chai": "^3.2.12",
+    "@types/ws": "^8.5.10",
+    "chai": "^4.4.1",
+    "mocha": "^10.4.0",
+    "npm-run-all": "^4.1.5",
+    "rimraf": "^6.1.3",
+    "sinon": "^18.0.0",
+    "sinon-chai": "^3.7.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  },
+  "files": [
+    "dist"
+  ]
+}
