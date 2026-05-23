@@ -1,5 +1,3 @@
-**Supports phoenixd 0.8.0**
-
 # Phoenixd TypeScript Client
 
 TypeScript client for phoenixd nodes with generated declaration files. Works in different JavaScript runtimes including Node.js and React Native.

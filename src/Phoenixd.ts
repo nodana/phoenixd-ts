@@ -1,4 +1,4 @@
-import { HttpClient, IHttpClient } from "./HttpClient";
+import { HttpClient, IHttpClient } from "./HttpClient.js";
 import type {
   PhoenixdClient,
   CreateInvoiceParams,
@@ -18,7 +18,7 @@ import type {
   lnUrlPayParams,
   lnUrlWithdrawParams,
   lnUrlAuthParams,
-} from "./types";
+} from "./types.js";
 
 export class Phoenixd implements PhoenixdClient {
   url: string;

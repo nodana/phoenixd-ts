@@ -5,20 +5,13 @@ import sinon from "sinon";
 const expect = chai.expect;
 chai.use(sinonChai);
 
-import { HttpClient, HttpClientError } from "../src/HttpClient";
+import { HttpClient, HttpClientError } from "../dist/HttpClient.js";
 
 const NODE_URL = "https://nodeurl.com";
 
-interface FakeResponse {
-  readonly ok: boolean;
-  readonly status: number;
-  readonly statusText?: string;
-  text(): Promise<string>;
-}
-
 describe("HttpClient", () => {
-  let http: InstanceType<typeof HttpClient>;
-  let fetchStub: sinon.SinonStub;
+  let http;
+  let fetchStub;
 
   beforeEach(() => {
     http = new HttpClient(NODE_URL, "password");
@@ -106,7 +99,7 @@ describe("HttpClient", () => {
     try {
       await http.get("/path");
       throw new Error("Expected request to fail");
-    } catch (error: any) {
+    } catch (error) {
       expect(error).to.be.instanceOf(HttpClientError);
       expect(error.message).to.equal(
         "Request failed with status 400: invalid invoice"
@@ -128,7 +121,7 @@ describe("HttpClient", () => {
     try {
       await http.get("/path");
       throw new Error("Expected request to fail");
-    } catch (error: any) {
+    } catch (error) {
       expect(error).to.be.instanceOf(HttpClientError);
       expect(error.message).to.equal(
         "Request failed with status 500: Internal Server Error"

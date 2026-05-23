@@ -1,6 +1,6 @@
 import chai from "chai";
 
-import { base64Encode } from "../src/utils";
+import { base64Encode } from "../dist/utils.js";
 
 const expect = chai.expect;
 

@@ -1,4 +1,4 @@
-import { base64Encode } from "./utils";
+import { base64Encode } from "./utils.js";
 
 export class HttpClientError extends Error {
   status: number;

@@ -1,18 +1,18 @@
 import chai from "chai";
-import sinon, { SinonSpy, SinonStub } from "sinon";
+import sinon from "sinon";
 import sinonChai from "sinon-chai";
 const expect = chai.expect;
 chai.use(sinonChai);
 
-import { Phoenixd } from "../src/Phoenixd";
-import { HttpClient } from "../src/HttpClient";
+import { Phoenixd } from "../dist/Phoenixd.js";
+import { HttpClient } from "../dist/HttpClient.js";
 
 const NODE_URL = "https://nodeurl.com";
 
 describe("Phoenixd", () => {
-  let pxd: InstanceType<typeof Phoenixd>;
-  let getStub: SinonStub;
-  let postStub: SinonStub;
+  let pxd;
+  let getStub;
+  let postStub;
 
   beforeEach(() => {
     getStub = sinon
