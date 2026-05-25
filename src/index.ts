@@ -1,5 +1,5 @@
 // Export Pxd client
-export { Phoenixd } from "./Phoenixd.js";
+export { Phoenixd } from "./Phoenixd";
 
 // Export types
-export * from "./types.js";
+export * from "./types";

@@ -1,32 +1,24 @@
-import chai from "chai";
-import sinon from "sinon";
-import sinonChai from "sinon-chai";
-const expect = chai.expect;
-chai.use(sinonChai);
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Phoenixd } from "../dist/Phoenixd.js";
-import { HttpClient } from "../dist/HttpClient.js";
+import { Phoenixd } from "../src/Phoenixd";
+import { HttpClient } from "../src/HttpClient";
 
 const NODE_URL = "https://nodeurl.com";
 
 describe("Phoenixd", () => {
   let pxd;
-  let getStub;
-  let postStub;
+  let getStub: ReturnType<typeof vi.spyOn>;
+  let postStub: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    getStub = sinon
-      .stub(HttpClient.prototype, "get")
-      .resolves({ test: "12345" });
-    postStub = sinon
-      .stub(HttpClient.prototype, "post")
-      .resolves({ test: "abcde" });
+    getStub = vi.spyOn(HttpClient.prototype, "get").mockResolvedValue({ test: "12345" });
+    postStub = vi.spyOn(HttpClient.prototype, "post").mockResolvedValue({ test: "abcde" });
 
     pxd = new Phoenixd(NODE_URL, "password");
   });
 
   afterEach(() => {
-    sinon.restore();
+    vi.restoreAllMocks();
   });
 
   describe("createInvoice", () => {
@@ -40,7 +32,7 @@ describe("Phoenixd", () => {
         };
         await pxd.createInvoice(data);
 
-        expect(postStub).to.have.been.calledWith("/createinvoice", data);
+        expect(postStub).toHaveBeenCalledWith("/createinvoice", data);
       });
     });
 
@@ -51,7 +43,7 @@ describe("Phoenixd", () => {
         };
         await pxd.createInvoice(data);
 
-        expect(postStub).to.have.been.calledWith("/createinvoice", data);
+        expect(postStub).toHaveBeenCalledWith("/createinvoice", data);
       });
     });
 
@@ -62,7 +54,7 @@ describe("Phoenixd", () => {
         };
         await pxd.createInvoice(data);
 
-        expect(postStub).to.have.not.been.called;
+        expect(postStub).not.toHaveBeenCalled();
       });
     });
   });
@@ -75,7 +67,7 @@ describe("Phoenixd", () => {
       };
       await pxd.payInvoice(data);
 
-      expect(postStub).to.have.been.calledWith("/payinvoice", data);
+      expect(postStub).toHaveBeenCalledWith("/payinvoice", data);
     });
   });
 
@@ -87,13 +79,13 @@ describe("Phoenixd", () => {
       };
       await pxd.createOffer(data);
 
-      expect(postStub).to.have.been.calledWith("/createoffer", data);
+      expect(postStub).toHaveBeenCalledWith("/createoffer", data);
     });
 
     it("should make correct request without params", async () => {
       await pxd.createOffer();
 
-      expect(postStub).to.have.been.calledWith("/createoffer", {});
+      expect(postStub).toHaveBeenCalledWith("/createoffer", {});
     });
   });
 
@@ -105,7 +97,7 @@ describe("Phoenixd", () => {
       };
       await pxd.payOffer(data);
 
-      expect(postStub).to.have.been.calledWith("/payoffer", data);
+      expect(postStub).toHaveBeenCalledWith("/payoffer", data);
     });
   });
 
@@ -119,7 +111,7 @@ describe("Phoenixd", () => {
       };
       await pxd.payLnAddress(data);
 
-      expect(postStub).to.have.been.calledWith("/paylnaddress", data);
+      expect(postStub).toHaveBeenCalledWith("/paylnaddress", data);
     });
   });
 
@@ -132,7 +124,7 @@ describe("Phoenixd", () => {
       };
       await pxd.sendToAddress(data);
 
-      expect(postStub).to.have.been.calledWith("/sendtoaddress", data);
+      expect(postStub).toHaveBeenCalledWith("/sendtoaddress", data);
     });
   });
 
@@ -143,7 +135,7 @@ describe("Phoenixd", () => {
       };
       await pxd.bumpFee(data);
 
-      expect(postStub).to.have.been.calledWith("/bumpfee", data);
+      expect(postStub).toHaveBeenCalledWith("/bumpfee", data);
     });
   });
 
@@ -152,7 +144,7 @@ describe("Phoenixd", () => {
       it("should make correct request", async () => {
         await pxd.listIncomingPayments();
 
-        expect(getStub).to.have.been.calledWith("/payments/incoming");
+        expect(getStub).toHaveBeenCalledWith("/payments/incoming");
       });
     });
 
@@ -165,7 +157,7 @@ describe("Phoenixd", () => {
           all: true,
         });
 
-        expect(getStub).to.have.been.calledWith(
+        expect(getStub).toHaveBeenCalledWith(
           "/payments/incoming?from=1000&limit=3&offset=1&all=true"
         );
       });
@@ -177,7 +169,7 @@ describe("Phoenixd", () => {
       const paymentHash = "12345";
       await pxd.getIncomingPayment(paymentHash);
 
-      expect(getStub).to.have.been.calledWith(
+      expect(getStub).toHaveBeenCalledWith(
         `/payments/incoming/${paymentHash}`
       );
     });
@@ -188,7 +180,7 @@ describe("Phoenixd", () => {
       it("should make correct request", async () => {
         await pxd.listOutgoingPayments();
 
-        expect(getStub).to.have.been.calledWith("/payments/outgoing");
+        expect(getStub).toHaveBeenCalledWith("/payments/outgoing");
       });
     });
 
@@ -201,7 +193,7 @@ describe("Phoenixd", () => {
           all: true,
         });
 
-        expect(getStub).to.have.been.calledWith(
+        expect(getStub).toHaveBeenCalledWith(
           "/payments/outgoing?to=2000&limit=3&offset=1&all=true"
         );
       });
@@ -213,7 +205,7 @@ describe("Phoenixd", () => {
       const paymentHash = "12345";
       await pxd.getOutgoingPayment(paymentHash);
 
-      expect(getStub).to.have.been.calledWith(
+      expect(getStub).toHaveBeenCalledWith(
         `/payments/outgoing/${paymentHash}`
       );
     });
@@ -224,7 +216,7 @@ describe("Phoenixd", () => {
       const paymentHash = "12345";
       await pxd.getOutgoingPaymentByHash(paymentHash);
 
-      expect(getStub).to.have.been.calledWith(
+      expect(getStub).toHaveBeenCalledWith(
         `/payments/outgoingbyhash/${paymentHash}`
       );
     });
@@ -235,7 +227,7 @@ describe("Phoenixd", () => {
       it("should make correct request", async () => {
         await pxd.exportPayments();
 
-        expect(postStub).to.have.been.calledWith("/export", {});
+        expect(postStub).toHaveBeenCalledWith("/export", {});
       });
     });
 
@@ -247,7 +239,7 @@ describe("Phoenixd", () => {
         };
         await pxd.exportPayments(data);
 
-        expect(postStub).to.have.been.calledWith("/export", data);
+        expect(postStub).toHaveBeenCalledWith("/export", data);
       });
     });
   });
@@ -256,7 +248,7 @@ describe("Phoenixd", () => {
     it("should make correct request", async () => {
       await pxd.getInfo();
 
-      expect(getStub).to.have.been.calledWith("/getinfo");
+      expect(getStub).toHaveBeenCalledWith("/getinfo");
     });
   });
 
@@ -264,7 +256,7 @@ describe("Phoenixd", () => {
     it("should make correct request", async () => {
       await pxd.getBalance();
 
-      expect(getStub).to.have.been.calledWith("/getbalance");
+      expect(getStub).toHaveBeenCalledWith("/getbalance");
     });
   });
 
@@ -272,7 +264,7 @@ describe("Phoenixd", () => {
     it("should make correct request", async () => {
       await pxd.getLightningAddress();
 
-      expect(getStub).to.have.been.calledWith("/getlnaddress");
+      expect(getStub).toHaveBeenCalledWith("/getlnaddress");
     });
   });
 
@@ -280,7 +272,7 @@ describe("Phoenixd", () => {
     it("should make correct request", async () => {
       await pxd.listChannels();
 
-      expect(getStub).to.have.been.calledWith("/listchannels");
+      expect(getStub).toHaveBeenCalledWith("/listchannels");
     });
   });
 
@@ -293,7 +285,7 @@ describe("Phoenixd", () => {
       };
       await pxd.closeChannel(data);
 
-      expect(postStub).to.have.been.calledWith("/closechannel", data);
+      expect(postStub).toHaveBeenCalledWith("/closechannel", data);
     });
   });
 
@@ -304,7 +296,7 @@ describe("Phoenixd", () => {
       };
       await pxd.decodeInvoice(data);
 
-      expect(postStub).to.have.been.calledWith("/decodeinvoice", data);
+      expect(postStub).toHaveBeenCalledWith("/decodeinvoice", data);
     });
   });
 
@@ -315,7 +307,7 @@ describe("Phoenixd", () => {
       };
       await pxd.decodeOffer(data);
 
-      expect(postStub).to.have.been.calledWith("/decodeoffer", data);
+      expect(postStub).toHaveBeenCalledWith("/decodeoffer", data);
     });
   });
 
@@ -323,7 +315,7 @@ describe("Phoenixd", () => {
     it("should make correct request", async () => {
       await pxd.estimateLiquidityFees({ amountSat: 2000000 });
 
-      expect(getStub).to.have.been.calledWith(
+      expect(getStub).toHaveBeenCalledWith(
         "/estimateliquidityfees?amountSat=2000000"
       );
     });
@@ -339,7 +331,7 @@ describe("Phoenixd", () => {
       };
       await pxd.lnUrlPay(data);
 
-      expect(postStub).to.have.been.calledWith("/lnurlpay", data);
+      expect(postStub).toHaveBeenCalledWith("/lnurlpay", data);
     });
   });
 
@@ -350,7 +342,7 @@ describe("Phoenixd", () => {
       };
       await pxd.lnUrlWithdraw(data);
 
-      expect(postStub).to.have.been.calledWith("/lnurlwithdraw", data);
+      expect(postStub).toHaveBeenCalledWith("/lnurlwithdraw", data);
     });
   });
 
@@ -361,7 +353,7 @@ describe("Phoenixd", () => {
       };
       await pxd.lnUrlAuth(data);
 
-      expect(postStub).to.have.been.calledWith("/lnurlauth", data);
+      expect(postStub).toHaveBeenCalledWith("/lnurlauth", data);
     });
   });
 });

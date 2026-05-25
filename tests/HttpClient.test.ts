@@ -1,53 +1,49 @@
-import chai from "chai";
-import sinonChai from "sinon-chai";
-import sinon from "sinon";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const expect = chai.expect;
-chai.use(sinonChai);
-
-import { HttpClient, HttpClientError } from "../dist/HttpClient.js";
+import { HttpClient, HttpClientError } from "../src/HttpClient";
 
 const NODE_URL = "https://nodeurl.com";
 
 describe("HttpClient", () => {
-  let http;
-  let fetchStub;
+  let http: HttpClient;
+  let fetchStub: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     http = new HttpClient(NODE_URL, "password");
-    fetchStub = sinon.stub();
-    fetchStub.resolves({
+    fetchStub = vi.fn();
+    fetchStub.mockResolvedValue({
       ok: true,
       status: 200,
-      text: sinon.fake.resolves(JSON.stringify({ foo: "bar" })),
+      text: vi.fn().mockResolvedValue(JSON.stringify({ foo: "bar" })),
     });
-    global.fetch = fetchStub;
+    vi.stubGlobal("fetch", fetchStub);
   });
 
   afterEach(() => {
-    sinon.restore();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("should make GET request", async () => {
     const response = await http.get("/path");
 
-    expect(fetchStub).to.have.been.calledWith(`${NODE_URL}/path`, {
+    expect(fetchStub).toHaveBeenCalledWith(`${NODE_URL}/path`, {
       method: "GET",
       headers: {
         Authorization: "Basic OnBhc3N3b3Jk",
         "Content-Type": "application/x-www-form-urlencoded",
       },
     });
-    expect(response).to.deep.equal({ foo: "bar" });
+    expect(response).toEqual({ foo: "bar" });
   });
 
   it("should encode non-ascii passwords in the auth header", async () => {
     http = new HttpClient(NODE_URL, "pässword");
-    global.fetch = fetchStub;
+    vi.stubGlobal("fetch", fetchStub);
 
     await http.get("/path");
 
-    expect(fetchStub).to.have.been.calledWith(`${NODE_URL}/path`, {
+    expect(fetchStub).toHaveBeenCalledWith(`${NODE_URL}/path`, {
       method: "GET",
       headers: {
         Authorization: "Basic OnDDpHNzd29yZA==",
@@ -66,7 +62,7 @@ describe("HttpClient", () => {
 
     await http.post("/path", body);
 
-    expect(fetchStub).to.have.been.calledWith(`${NODE_URL}/path`, {
+    expect(fetchStub).toHaveBeenCalledWith(`${NODE_URL}/path`, {
       method: "POST",
       headers: {
         Authorization: "Basic OnBhc3N3b3Jk",
@@ -77,56 +73,56 @@ describe("HttpClient", () => {
   });
 
   it("should parse plain text responses", async () => {
-    fetchStub.resolves({
+    fetchStub.mockResolvedValue({
       ok: true,
       status: 200,
-      text: sinon.fake.resolves("plain response"),
+      text: vi.fn().mockResolvedValue("plain response"),
     });
 
     const response = await http.get("/path");
 
-    expect(response).to.equal("plain response");
+    expect(response).toBe("plain response");
   });
 
   it("should include response details in failed requests", async () => {
-    fetchStub.resolves({
+    fetchStub.mockResolvedValue({
       ok: false,
       status: 400,
       statusText: "Bad Request",
-      text: sinon.fake.resolves("invalid invoice"),
+      text: vi.fn().mockResolvedValue("invalid invoice"),
     });
 
     try {
       await http.get("/path");
       throw new Error("Expected request to fail");
-    } catch (error) {
-      expect(error).to.be.instanceOf(HttpClientError);
-      expect(error.message).to.equal(
+    } catch (error: any) {
+      expect(error).toBeInstanceOf(HttpClientError);
+      expect(error.message).toBe(
         "Request failed with status 400: invalid invoice"
       );
-      expect(error.status).to.equal(400);
-      expect(error.statusText).to.equal("Bad Request");
-      expect(error.body).to.equal("invalid invoice");
+      expect(error.status).toBe(400);
+      expect(error.statusText).toBe("Bad Request");
+      expect(error.body).toBe("invalid invoice");
     }
   });
 
   it("should fall back to status text for failed requests without a body", async () => {
-    fetchStub.resolves({
+    fetchStub.mockResolvedValue({
       ok: false,
       status: 500,
       statusText: "Internal Server Error",
-      text: sinon.fake.resolves(""),
+      text: vi.fn().mockResolvedValue(""),
     });
 
     try {
       await http.get("/path");
       throw new Error("Expected request to fail");
-    } catch (error) {
-      expect(error).to.be.instanceOf(HttpClientError);
-      expect(error.message).to.equal(
+    } catch (error: any) {
+      expect(error).toBeInstanceOf(HttpClientError);
+      expect(error.message).toBe(
         "Request failed with status 500: Internal Server Error"
       );
-      expect(error.body).to.equal("");
+      expect(error.body).toBe("");
     }
   });
 });
