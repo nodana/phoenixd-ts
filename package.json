@@ -1,6 +1,6 @@
 {
   "name": "@nodana/phoenixd-ts",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "A TypeScript client for Phoenixd Lightning nodes",
   "repository": {
     "type": "git",
@@ -20,7 +20,7 @@
   "sideEffects": false,
   "scripts": {
     "clean": "rimraf dist",
-    "build": "tsup && tsc --emitDeclarationOnly --outDir dist && cp package.module.json dist/package.json && cp package.commonjs.json dist/cjs/package.json",
+    "build": "tsup && tsup --config tsup.dts.config.ts && cp package.module.json dist/package.json && cp package.commonjs.json dist/cjs/package.json",
     "prepublishOnly": "npm test",
     "test": "run-s test:unit build",
     "test:unit": "vitest run"

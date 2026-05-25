@@ -31,7 +31,6 @@ import type {
   BumpFeeParams,
   CloseChannelParams,
   CreateInvoiceParams,
-  PhoenixdClient,
   CreateInvoiceResponse,
   CreateOfferParams,
   EstimateLiquidityFeesParams,
@@ -47,6 +46,7 @@ import type {
   PayInvoiceParams,
   PayLnAddressParams,
   PayOfferParams,
+  PhoenixdClient,
   SendToAddressParams,
   WebsocketPayment,
 } from "@nodana/phoenixd-ts";
