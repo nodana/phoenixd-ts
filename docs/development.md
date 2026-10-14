@@ -33,4 +33,20 @@ This refresh retains `new Phoenixd(url, password)` and the existing HTTP method 
 - Import errors from the package root. Legacy lowercase `lnUrl*Params` type names remain deprecated aliases.
 - The supported Node baseline is 22. Portable HTTP callers can use `/http`; non-Node subscription callers provide a socket factory.
 
-The next package version is 0.2.0, reflecting these API corrections. It has not been published. Release it before publishing packages that require the modernised client.
+Version 0.2.0 contains these API corrections.
+
+## Release
+
+Publishing a GitHub Release triggers `.github/workflows/npm-publish.yml`. Pushes to branches or tags, pull requests, draft releases and release-note edits do not trigger publication.
+
+1. Update the version in `package.json` and `package-lock.json`, for example with `npm version patch --no-git-tag-version`.
+2. Commit and push the version change and release code to `main`.
+3. In GitHub, open **Releases → Draft a new release**. Create a tag matching the package version exactly, such as `v0.2.1`, targeting the release commit on `main`.
+4. Add the release title and notes, then click **Publish release**.
+5. Check the **Publish to npm** workflow. It validates the release tag and both manifest versions, installs dependencies, runs the checks, and publishes the tagged code to npm with provenance. Its summary reports whether publication succeeded.
+
+The npm trusted publisher must point to organisation `nodana`, repository `phoenixd-ts`, workflow `npm-publish.yml`, with no environment and direct publishing allowed. The source repository must be public for npm provenance. Stable releases publish to the `latest` npm dist-tag; GitHub prereleases publish to `next`.
+
+The workflow checks and builds before publishing, then uses `--ignore-scripts` to avoid running `prepublishOnly` a second time. Manual `npm publish` still runs the full test/build hook. Test results remain in the logs; the Actions summary reports the release outcome.
+
+npm versions cannot be overwritten. If a release fails before publication, fix the cause before retrying. For versions already on npm, create a GitHub Release from the tag matching their original source commit rather than publishing the package again.
