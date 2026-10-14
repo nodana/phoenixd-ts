@@ -2,9 +2,8 @@ const BASE64_CHARS =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 function utf8Encode(value: string) {
-  return encodeURIComponent(value).replace(
-    /%([0-9A-F]{2})/g,
-    (_, hex) => String.fromCharCode(parseInt(hex, 16))
+  return encodeURIComponent(value).replace(/%([0-9A-F]{2})/g, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16)),
   );
 }
 

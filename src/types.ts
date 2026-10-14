@@ -1,216 +1,139 @@
-export interface LocalParams {
-  nodeId: string;
-  fundingKeyPath: string;
-  dustLimit: number;
-  maxHtlcValueInFlightMsat: number;
-  htlcMinimum: number;
-  toSelfDelay: number;
-  maxAcceptedHtlcs: number;
-  isInitiator: boolean;
+/** Dates are Unix timestamps in milliseconds unless a field says otherwise. */
+export type Timestamp = Date | number;
+
+export type JsonValue =
+  string | number | boolean | null | JsonValue[] | JsonObject;
+
+export interface JsonObject {
+  [key: string]: JsonValue;
 }
 
-export interface RemoteParams {
-  nodeId: string;
-  dustLimit: number;
-  maxHtlcValueInFlightMsat: number;
-  htlcMinimum: number;
+export interface RequestOptions {
+  signal?: AbortSignal;
+  /** Request deadline in milliseconds. 0 disables the configured deadline. */
+  timeoutMs?: number;
 }
 
-export interface Commitments {
-  params: {
-    channelId: string;
-    channelConfig: string[];
-    channelFeatures: string[];
-    localParams: LocalParams;
-    remoteParams: RemoteParams;
-    channelFlags: number;
-  };
+export interface PhoenixdOptions extends RequestOptions {
+  /** Use a platform fetch implementation or instrument requests. */
+  fetch?: typeof globalThis.fetch;
 }
 
-export interface ChannelUpdate {
-  signature: string;
-  chainHash: string;
-  shortChannelId: string;
-  timestampSeconds: number;
-  messageFlags: number;
-  channelFlags: number;
-  cltvExpiryDelta: number;
-  htlcMinimumMsat: number;
-  feeBaseMsat: number;
-  feeProportionalMillionths: number;
-  htlcMaximumMsat: number;
-}
+/** Select an amount, empty the wallet, or use the invoice/offer amount. */
+export type PaymentAmount =
+  | { amountSat: number; sendAll?: never }
+  | { amountSat?: never; sendAll: true }
+  | { amountSat?: never; sendAll?: never };
 
-export interface ChannelCompact {
-  state: string;
-  channelId: string;
-  balanceSat: number;
-  inboundLiquiditySat: number;
-  capacitySat: number;
-  fundingTxId: string;
-}
+export type RequiredPaymentAmount = Exclude<
+  PaymentAmount,
+  { amountSat?: never; sendAll?: never }
+>;
 
-export interface Channel {
-  type: string;
-  commitments: Commitments;
-  shortChannelId: string;
-  channelUpdate: ChannelUpdate;
-}
-
-export interface CloseChannelParams {
-  /** identifier of the channel to close */
-  channelId: string;
-  /** bitcoin address where your balance will be sent to */
-  address: string;
-  /** fee rate in satoshi per vbyte */
-  feerateSatByte: number;
-}
-
-export interface CreateInvoiceParams {
-  /** the description of the invoice (max. 128 characters) */
-  description?: string;
-  /** sha256 hash of a description */
-  descriptionHash?: string;
-  /** the amount requested by the invoice, in satoshi. */
+export type CreateInvoiceParams = {
   amountSat?: number;
-  /** the invoice expiry in seconds, by default 3600 (1 hour). */
   expirySeconds?: number;
-  /** an optional custom identifier. Use that to link the invoice to an external system. */
   externalId?: string;
-  /** a webhook url that will be notified when this specific payment has been received. */
   webhookUrl?: string;
-}
-
-export interface PayInvoiceParams {
-  /** BOLT11 invoice */
-  invoice: string;
-  /**  optional amount in satoshi. If unset, will pay the amount requested in the invoice */
-  amountSat?: number;
-  /** optional, mutually exclusive with amountSat. Will empty the wallet if there is a single channel. */
-  sendAll?: boolean;
-}
+} & (
+  | { description: string; descriptionHash?: never }
+  | { description?: never; descriptionHash: string }
+);
 
 export interface CreateOfferParams {
-  /** the description of the offer (max. 128 characters) */
   description?: string;
-  /** the amount requested by the offer, in satoshi. */
   amountSat?: number;
 }
 
-export interface PayOfferParams {
-  /** BOLT12 offer */
+export type PayInvoiceParams = { invoice: string } & PaymentAmount;
+
+export type PayOfferParams = {
   offer: string;
-  /** optional amount in satoshi. If unset, will pay the amount requested in the invoice */
-  amountSat?: number;
-  /** optional, mutually exclusive with amountSat. Will empty the wallet if there is a single channel. */
-  sendAll?: boolean;
-  /** optional message */
   message?: string;
+} & PaymentAmount;
+
+export type PayLnAddressParams = {
+  address: string;
+  message?: string;
+} & RequiredPaymentAmount;
+
+export type LnUrlPayParams = {
+  lnurl: string;
+  message?: string;
+} & PaymentAmount;
+
+export interface LnUrlWithdrawParams {
+  lnurl: string;
 }
 
-export interface PayLnAddressParams {
-  /** email-like Lightning address, based on BIP-353 or LNURL */
-  address: string;
-  /** amount in satoshi. If unset, will pay the amount requested in the invoice */
-  amountSat?: number;
-  /** optional, mutually exclusive with amountSat. Will empty the wallet if there is a single channel. */
-  sendAll?: boolean;
-  /** optional message for the recipient */
-  message?: string;
+export interface LnUrlAuthParams {
+  lnurl: string;
 }
+
+/** @deprecated Use LnUrlPayParams. */
+export type lnUrlPayParams = LnUrlPayParams;
+
+/** @deprecated Use LnUrlWithdrawParams. */
+export type lnUrlWithdrawParams = LnUrlWithdrawParams;
+
+/** @deprecated Use LnUrlAuthParams. */
+export type lnUrlAuthParams = LnUrlAuthParams;
 
 export interface SendToAddressParams {
-  /** amount in satoshi */
   amountSat: number;
-  /** Bitcoin address where funds will be sent */
   address: string;
-  /** feerate in satoshi per vbyte */
   feerateSatByte: number;
 }
 
 export interface BumpFeeParams {
-  /** fee rate in satoshi per vbyte */
   feerateSatByte: number;
 }
 
-export interface ListIncomingPaymentsParams {
-  /** start timestamp in millis from epoch, default 0 */
-  from?: Date;
-  /** end timestamp in millis from epoch, default now */
-  to?: Date;
-  /** number of payments in the page, default 20 */
-  limit?: number;
-  /** page offset, default 0 */
-  offset?: number;
-  /** also return unpaid invoices */
-  all?: boolean;
-  /** only include payments that use this external id */
-  externalId?: string;
-}
-
-export interface ListOutgoingPaymentsParams {
-  /** start timestamp in millis from epoch, default 0 */
-  from?: Date;
-  /** end timestamp in millis from epoch, default now */
-  to?: Date;
-  /** number of payments in the page, default 20 */
-  limit?: number;
-  /** page offset, default 0 */
-  offset?: number;
-  /** also return unpaid invoices */
-  all?: boolean;
+export interface CloseChannelParams extends BumpFeeParams {
+  channelId: string;
+  address: string;
 }
 
 export interface ExportPaymentsParams {
-  /** start timestamp in millis from epoch, default 0 */
-  from?: Date | number;
-  /** end timestamp in millis from epoch, default now */
-  to?: Date | number;
+  from?: Timestamp;
+  to?: Timestamp;
+}
+
+export interface ListOutgoingPaymentsParams extends ExportPaymentsParams {
+  limit?: number;
+  offset?: number;
+  /** Include failed outgoing payments. */
+  all?: boolean;
+}
+
+export interface ListIncomingPaymentsParams extends ExportPaymentsParams {
+  limit?: number;
+  offset?: number;
+  /** Include unpaid invoices. */
+  all?: boolean;
+  externalId?: string;
 }
 
 export interface DecodeInvoiceParams {
-  /** BOLT11 invoice */
   invoice: string;
 }
 
 export interface DecodeOfferParams {
-  /** BOLT12 offer */
   offer: string;
 }
 
 export interface EstimateLiquidityFeesParams {
-  /** the liquidity amount, in satoshi */
   amountSat: number;
-}
-
-export interface lnUrlPayParams {
-  /** amount in satoshi */
-  amountSat?: number;
-  /** optional, mutually exclusive with amountSat. Will empty the wallet if there is a single channel. */
-  sendAll?: boolean;
-  /** the lnurl-pay resource */
-  lnurl: string;
-  /** (optional) a comment for the recipient */
-  message?: string;
-}
-
-export interface lnUrlWithdrawParams {
-  /** the lnurl-withdraw resource */
-  lnurl: string;
-}
-
-export interface lnUrlAuthParams {
-  /** the lnurl-auth resource */
-  lnurl: string;
 }
 
 export interface CreateInvoiceResponse {
-  amountSat: number;
+  amountSat?: number | null;
   paymentHash: string;
   serialized: string;
 }
 
 export interface Payment {
+  type: "payment_sent";
   recipientAmountSat: number;
   routingFeeSat: number;
   paymentId: string;
@@ -218,14 +141,55 @@ export interface Payment {
   paymentPreimage: string;
 }
 
+export type PaymentSent = Payment;
+
+export interface PaymentFailed {
+  type: "payment_failed";
+  paymentHash?: string | null;
+  offerId?: string | null;
+  reason: string;
+}
+
+/** Phoenixd can report payment_failed with HTTP 200. */
+export type PaymentResult = Payment | PaymentFailed;
+
+export interface ChannelCompact {
+  state: string;
+  channelId?: string | null;
+  balanceSat?: number | null;
+  inboundLiquiditySat?: number | null;
+  capacitySat?: number | null;
+  fundingTxId?: string | null;
+}
+
+/** Full channel state is upstream JSON. Use getInfo().channels for typed summaries. */
+export type Channel = JsonObject;
+
+export type ListChannelsResponse = Channel[];
+
 export interface NodeInfo {
   nodeId: string;
   channels: ChannelCompact[];
+  chain: string;
+  blockHeight?: number | null;
+  version: string;
+}
+
+export interface SwapInBalance {
+  unconfirmedBalanceSat: number;
+  weaklyConfirmedBalanceSat: number;
+  deeplyConfirmedBalanceSat: number;
 }
 
 export interface Balance {
   balanceSat: number;
   feeCreditSat: number;
+  swapIn?: SwapInBalance | null;
+}
+
+export interface SwapInAddress {
+  address: string;
+  index: number;
 }
 
 export interface LiquidityFeesEstimate {
@@ -233,9 +197,8 @@ export interface LiquidityFeesEstimate {
   serviceFeeSat: number;
 }
 
-export type ListChannelsResponse = Channel[];
-
 export type IncomingPaymentType = "incoming_payment";
+
 export type IncomingPaymentSubType = "lightning";
 
 export interface IncomingPayment {
@@ -244,39 +207,51 @@ export interface IncomingPayment {
   paymentHash: string;
   preimage: string;
   externalId?: string | null;
-  description?: string;
-  invoice?: string;
+  description?: string | null;
+  invoice?: string | null;
   isPaid: boolean;
-  isExpired?: boolean;
-  requestedSat?: number;
+  isExpired: boolean;
+  requestedSat?: number | null;
   receivedSat: number;
+  /** Fees in millisatoshis. */
   fees: number;
-  payerKey?: string;
-  expiresAt?: number;
-  completedAt?: number;
+  payerNote?: string | null;
+  payerKey?: string | null;
+  expiresAt?: number | null;
+  completedAt?: number | null;
   createdAt: number;
 }
 
 export type OutgoingPaymentType = "outgoing_payment";
-export type OutgoingPaymentSubType = "lightning" | "auto_liquidity";
+
+export type OutgoingPaymentSubType =
+  | "lightning"
+  | "auto_liquidity"
+  | "manual_liquidity"
+  | "splice_out"
+  | "splice_cpfp"
+  | "channel_close";
 
 export interface OutgoingPayment {
   type: OutgoingPaymentType;
   subType: OutgoingPaymentSubType;
   paymentId: string;
-  paymentHash?: string;
-  preimage?: string;
-  txId?: string;
+  paymentHash?: string | null;
+  preimage?: string | null;
+  txId?: string | null;
   isPaid: boolean;
+  /** Amount in satoshis. */
   sent: number;
+  /** Fees in millisatoshis. */
   fees: number;
-  invoice?: string;
-  completedAt?: number;
+  invoice?: string | null;
+  completedAt?: number | null;
   createdAt: number;
 }
 
 export interface LnUrlWithdrawal {
   url: string;
+  /** Amounts in millisatoshis. */
   minWithdrawable: number;
   maxWithdrawable: number;
   description: string;
@@ -284,7 +259,6 @@ export interface LnUrlWithdrawal {
   invoice: string;
 }
 
-/* Websocket payload for payment notifications */
 export interface WebsocketPayment {
   type: "payment_received";
   amountSat: number;
@@ -292,38 +266,132 @@ export interface WebsocketPayment {
   externalId?: string | null;
   payerNote?: string | null;
   payerKey?: string | null;
-  timestamp?: number;
+  timestamp: number;
+}
+
+export interface InvoiceFeatures {
+  activated: Record<string, string>;
+  unknown: number[];
+}
+
+export interface DecodedInvoice {
+  chain: string;
+  /** Invoice amount in millisatoshis. Omitted for amountless invoices. */
+  amount?: number | null;
+  paymentHash: string;
+  description?: string | null;
+  descriptionHash?: string | null;
+  minFinalCltvExpiryDelta?: number | null;
+  paymentSecret: string;
+  paymentMetadata?: string | null;
+  expirySeconds?: number | null;
+  extraHops: JsonObject[][];
+  features?: InvoiceFeatures | null;
+  timestampSeconds: number;
+  unknownTags?: JsonObject[] | null;
+  invalidTags?: JsonObject[] | null;
+}
+
+export interface DecodedOffer {
+  chain: string;
+  chainHashes?: string[] | null;
+  /** Amount in millisatoshis for Bitcoin offers; check currency for other offers. */
+  amount?: number | null;
+  currency?: string | null;
+  issuer?: string | null;
+  quantityMax?: number | null;
+  description?: string | null;
+  metadata?: string | null;
+  /** Absolute offer expiry, in Unix seconds. */
+  expirySeconds?: number | null;
+  issuerId?: string | null;
+  path?: JsonObject[] | null;
+  features?: InvoiceFeatures | null;
+  unknownTlvs?: JsonObject[] | null;
 }
 
 export interface PhoenixdClient {
-  createInvoice(params: CreateInvoiceParams): Promise<CreateInvoiceResponse>;
-  payInvoice(params: PayInvoiceParams): Promise<Payment>;
-  createOffer(params?: CreateOfferParams): Promise<string>;
-  payOffer(params: PayOfferParams): Promise<Payment>;
-  payLnAddress(params: PayLnAddressParams): Promise<Payment>;
-  sendToAddress(params: SendToAddressParams): Promise<string>;
-  bumpFee(params: BumpFeeParams): Promise<string>;
+  createInvoice(
+    params: CreateInvoiceParams,
+    options?: RequestOptions,
+  ): Promise<CreateInvoiceResponse>;
+  payInvoice(
+    params: PayInvoiceParams,
+    options?: RequestOptions,
+  ): Promise<PaymentResult>;
+  createOffer(
+    params?: CreateOfferParams,
+    options?: RequestOptions,
+  ): Promise<string>;
+  payOffer(
+    params: PayOfferParams,
+    options?: RequestOptions,
+  ): Promise<PaymentResult>;
+  payLnAddress(
+    params: PayLnAddressParams,
+    options?: RequestOptions,
+  ): Promise<PaymentResult>;
+  sendToAddress(
+    params: SendToAddressParams,
+    options?: RequestOptions,
+  ): Promise<string>;
+  bumpFee(params: BumpFeeParams, options?: RequestOptions): Promise<string>;
+  closeChannel(
+    params: CloseChannelParams,
+    options?: RequestOptions,
+  ): Promise<string>;
   listIncomingPayments(
-    params?: ListIncomingPaymentsParams
+    params?: ListIncomingPaymentsParams,
+    options?: RequestOptions,
   ): Promise<IncomingPayment[]>;
-  getIncomingPayment(paymentHash: string): Promise<IncomingPayment>;
   listOutgoingPayments(
-    params?: ListOutgoingPaymentsParams
+    params?: ListOutgoingPaymentsParams,
+    options?: RequestOptions,
   ): Promise<OutgoingPayment[]>;
-  getOutgoingPayment(paymentId: string): Promise<OutgoingPayment>;
-  getOutgoingPaymentByHash(paymentHash: string): Promise<OutgoingPayment>;
-  exportPayments(params?: ExportPaymentsParams): Promise<string>;
-  getInfo(): Promise<NodeInfo>;
-  getBalance(): Promise<Balance>;
-  getLightningAddress(): Promise<string>;
-  listChannels(): Promise<ListChannelsResponse>;
-  closeChannel(params: CloseChannelParams): Promise<string>;
-  decodeInvoice(params: DecodeInvoiceParams): Promise<any>;
-  decodeOffer(params: DecodeOfferParams): Promise<any>;
+  exportPayments(
+    params?: ExportPaymentsParams,
+    options?: RequestOptions,
+  ): Promise<string>;
+  getInfo(options?: RequestOptions): Promise<NodeInfo>;
+  getBalance(options?: RequestOptions): Promise<Balance>;
+  getLightningAddress(options?: RequestOptions): Promise<string>;
+  getOffer(options?: RequestOptions): Promise<string>;
+  getSwapInAddress(options?: RequestOptions): Promise<SwapInAddress>;
+  listChannels(options?: RequestOptions): Promise<ListChannelsResponse>;
+  decodeInvoice(
+    params: DecodeInvoiceParams,
+    options?: RequestOptions,
+  ): Promise<DecodedInvoice>;
+  decodeOffer(
+    params: DecodeOfferParams,
+    options?: RequestOptions,
+  ): Promise<DecodedOffer>;
   estimateLiquidityFees(
-    params: EstimateLiquidityFeesParams
+    params: EstimateLiquidityFeesParams,
+    options?: RequestOptions,
   ): Promise<LiquidityFeesEstimate>;
-  lnUrlPay(params: lnUrlPayParams): Promise<Payment>;
-  lnUrlWithdraw(params: lnUrlWithdrawParams): Promise<LnUrlWithdrawal>;
-  lnUrlAuth(params: lnUrlAuthParams): Promise<string>;
+  lnUrlPay(
+    params: LnUrlPayParams,
+    options?: RequestOptions,
+  ): Promise<PaymentResult>;
+  lnUrlWithdraw(
+    params: LnUrlWithdrawParams,
+    options?: RequestOptions,
+  ): Promise<LnUrlWithdrawal>;
+  lnUrlAuth(params: LnUrlAuthParams, options?: RequestOptions): Promise<string>;
+  getIncomingPayment(
+    id: string,
+    options?: RequestOptions,
+  ): Promise<IncomingPayment | null>;
+  getOutgoingPayment(
+    id: string,
+    options?: RequestOptions,
+  ): Promise<OutgoingPayment | null>;
+  getOutgoingPaymentByHash(
+    id: string,
+    options?: RequestOptions,
+  ): Promise<OutgoingPayment | null>;
+  subscribePayments(
+    options: import("./subscriptions").PaymentSubscriptionOptions,
+  ): import("./subscriptions").PaymentSubscription;
 }

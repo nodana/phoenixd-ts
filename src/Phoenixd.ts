@@ -1,168 +1,262 @@
-import { HttpClient, IHttpClient } from "./HttpClient";
+import { HttpClient } from "./HttpClient";
+import { subscribePayments } from "./subscriptions";
+import type * as T from "./types";
 import type {
-  PhoenixdClient,
-  CreateInvoiceParams,
-  CreateOfferParams,
-  PayInvoiceParams,
-  PayOfferParams,
-  CloseChannelParams,
-  BumpFeeParams,
-  ExportPaymentsParams,
-  EstimateLiquidityFeesParams,
-  PayLnAddressParams,
-  SendToAddressParams,
-  ListIncomingPaymentsParams,
-  ListOutgoingPaymentsParams,
-  DecodeInvoiceParams,
-  DecodeOfferParams,
-  lnUrlPayParams,
-  lnUrlWithdrawParams,
-  lnUrlAuthParams,
-} from "./types";
+  PaymentSubscription,
+  PaymentSubscriptionOptions,
+} from "./subscriptions";
 
-export class Phoenixd implements PhoenixdClient {
-  url: string;
-  password: string;
-  private _httpClient: IHttpClient;
+export class Phoenixd implements T.PhoenixdClient {
+  readonly #http: HttpClient;
+  readonly #password: string;
 
-  public constructor(url: string, password: string) {
-    this.url = url;
-    this.password = password;
-    this._httpClient = new HttpClient(url, password);
+  constructor(
+    public readonly url: string,
+    password: string,
+    options: T.PhoenixdOptions = {},
+  ) {
+    this.#password = password;
+    this.#http = new HttpClient(url, password, options);
   }
 
-  public async createInvoice(params: CreateInvoiceParams) {
-    if (!params.description && !params.descriptionHash) {
-      console.info(
-        "Either 'description' or 'descriptionHash' must be provided"
+  async createInvoice(
+    params: T.CreateInvoiceParams,
+    options?: T.RequestOptions,
+  ): Promise<T.CreateInvoiceResponse> {
+    if (
+      (params.description !== undefined) ===
+      (params.descriptionHash !== undefined)
+    )
+      throw new TypeError(
+        "Provide exactly one of description or descriptionHash",
       );
-      return;
-    }
 
-    return this._httpClient.post("/createinvoice", params);
+    return this.#http.request("POST", "createinvoice", params, options);
   }
 
-  public async payInvoice(params: PayInvoiceParams) {
-    return this._httpClient.post("/payinvoice", params);
+  async payInvoice(
+    params: T.PayInvoiceParams,
+    options?: T.RequestOptions,
+  ): Promise<T.PaymentResult> {
+    if (params.amountSat !== undefined && params.sendAll !== undefined)
+      throw new TypeError("amountSat and sendAll are mutually exclusive");
+
+    if (params.sendAll !== undefined && params.sendAll !== true)
+      throw new TypeError("sendAll must be true");
+
+    return this.#http.request("POST", "payinvoice", params, options);
   }
 
-  public async createOffer(params?: CreateOfferParams) {
-    return this._httpClient.post("/createoffer", params ?? {});
-  }
+  async createOffer(
+    params?: T.CreateOfferParams,
+    options?: T.RequestOptions,
+  ): Promise<string> {
+    if (params?.amountSat !== undefined && params.description === undefined)
+      throw new TypeError("An offer with an amount requires a description");
 
-  public async payOffer(params: PayOfferParams) {
-    return this._httpClient.post("/payoffer", params);
-  }
-
-  public async payLnAddress(params: PayLnAddressParams) {
-    return this._httpClient.post("/paylnaddress", params);
-  }
-
-  public async sendToAddress(params: SendToAddressParams) {
-    return this._httpClient.post("/sendtoaddress", params);
-  }
-
-  public async bumpFee(params: BumpFeeParams) {
-    return this._httpClient.post("/bumpfee", params);
-  }
-
-  public async listIncomingPayments(params?: ListIncomingPaymentsParams) {
-    let path = "/payments/incoming";
-
-    if (params) {
-      const qs = this._toQueryString(params);
-      path += `?${qs}`;
-    }
-
-    return this._httpClient.get(path);
-  }
-
-  public async getIncomingPayment(paymentHash: string) {
-    return this._httpClient.get(`/payments/incoming/${paymentHash}`);
-  }
-
-  public async listOutgoingPayments(params?: ListOutgoingPaymentsParams) {
-    let path = "/payments/outgoing";
-
-    if (params) {
-      const qs = this._toQueryString(params);
-      path += `?${qs}`;
-    }
-
-    return this._httpClient.get(path);
-  }
-
-  public async getOutgoingPayment(paymentId: string) {
-    return this._httpClient.get(`/payments/outgoing/${paymentId}`);
-  }
-
-  public async getOutgoingPaymentByHash(paymentHash: string) {
-    return this._httpClient.get(`/payments/outgoingbyhash/${paymentHash}`);
-  }
-
-  public async exportPayments(params?: ExportPaymentsParams) {
-    return this._httpClient.post("/export", params ?? {});
-  }
-
-  public async getInfo() {
-    return this._httpClient.get("/getinfo");
-  }
-
-  public async getBalance() {
-    return this._httpClient.get("/getbalance");
-  }
-
-  public async getLightningAddress() {
-    return this._httpClient.get("/getlnaddress");
-  }
-
-  public async listChannels() {
-    return this._httpClient.get("/listchannels");
-  }
-
-  public async closeChannel(params: CloseChannelParams) {
-    return this._httpClient.post("/closechannel", params);
-  }
-
-  public async decodeInvoice(params: DecodeInvoiceParams) {
-    return this._httpClient.post("/decodeinvoice", params);
-  }
-
-  public async decodeOffer(params: DecodeOfferParams) {
-    return this._httpClient.post("/decodeoffer", params);
-  }
-
-  public async estimateLiquidityFees(params: EstimateLiquidityFeesParams) {
-    const qs = this._toQueryString(params);
-    return this._httpClient.get(`/estimateliquidityfees?${qs}`);
-  }
-
-  public async lnUrlPay(params: lnUrlPayParams) {
-    return this._httpClient.post("/lnurlpay", params);
-  }
-
-  public async lnUrlWithdraw(params: lnUrlWithdrawParams) {
-    return this._httpClient.post("/lnurlwithdraw", params);
-  }
-
-  public async lnUrlAuth(params: lnUrlAuthParams) {
-    return this._httpClient.post("/lnurlauth", params);
-  }
-
-  private _toQueryString(params: Record<string, any>) {
-    const searchParams = new URLSearchParams();
-
-    Object.entries(params).forEach(([key, value]) => {
-      if (value === undefined || value === null) {
-        return;
-      }
-
-      searchParams.append(
-        key,
-        value instanceof Date ? value.getTime().toString() : String(value)
-      );
+    return this.#http.request("POST", "createoffer", params, options, {
+      text: true,
     });
+  }
 
-    return searchParams.toString();
+  async payOffer(
+    params: T.PayOfferParams,
+    options?: T.RequestOptions,
+  ): Promise<T.PaymentResult> {
+    if (params.amountSat !== undefined && params.sendAll !== undefined)
+      throw new TypeError("amountSat and sendAll are mutually exclusive");
+
+    if (params.sendAll !== undefined && params.sendAll !== true)
+      throw new TypeError("sendAll must be true");
+
+    return this.#http.request("POST", "payoffer", params, options);
+  }
+
+  async payLnAddress(
+    params: T.PayLnAddressParams,
+    options?: T.RequestOptions,
+  ): Promise<T.PaymentResult> {
+    if (params.amountSat !== undefined && params.sendAll !== undefined)
+      throw new TypeError("amountSat and sendAll are mutually exclusive");
+
+    if (params.sendAll !== undefined && params.sendAll !== true)
+      throw new TypeError("sendAll must be true");
+
+    if (params.amountSat === undefined && params.sendAll !== true)
+      throw new TypeError("Provide amountSat or sendAll");
+
+    return this.#http.request("POST", "paylnaddress", params, options);
+  }
+
+  async sendToAddress(
+    params: T.SendToAddressParams,
+    options?: T.RequestOptions,
+  ): Promise<string> {
+    return this.#http.request("POST", "sendtoaddress", params, options, {
+      text: true,
+    });
+  }
+
+  async bumpFee(
+    params: T.BumpFeeParams,
+    options?: T.RequestOptions,
+  ): Promise<string> {
+    return this.#http.request("POST", "bumpfee", params, options, {
+      text: true,
+    });
+  }
+
+  async closeChannel(
+    params: T.CloseChannelParams,
+    options?: T.RequestOptions,
+  ): Promise<string> {
+    return this.#http.request("POST", "closechannel", params, options, {
+      text: true,
+    });
+  }
+
+  async listIncomingPayments(
+    params?: T.ListIncomingPaymentsParams,
+    options?: T.RequestOptions,
+  ): Promise<T.IncomingPayment[]> {
+    return this.#http.request("GET", "payments/incoming", params, options);
+  }
+
+  async listOutgoingPayments(
+    params?: T.ListOutgoingPaymentsParams,
+    options?: T.RequestOptions,
+  ): Promise<T.OutgoingPayment[]> {
+    return this.#http.request("GET", "payments/outgoing", params, options);
+  }
+
+  async exportPayments(
+    params?: T.ExportPaymentsParams,
+    options?: T.RequestOptions,
+  ): Promise<string> {
+    return this.#http.request("POST", "export", params, options, {
+      query: true,
+      text: true,
+    });
+  }
+
+  async getInfo(options?: T.RequestOptions): Promise<T.NodeInfo> {
+    return this.#http.request("GET", "getinfo", {}, options);
+  }
+
+  async getBalance(options?: T.RequestOptions): Promise<T.Balance> {
+    return this.#http.request("GET", "getbalance", {}, options);
+  }
+
+  async getLightningAddress(options?: T.RequestOptions): Promise<string> {
+    return this.#http.request("GET", "getlnaddress", {}, options, {
+      text: true,
+    });
+  }
+
+  async getOffer(options?: T.RequestOptions): Promise<string> {
+    return this.#http.request("GET", "getoffer", {}, options, { text: true });
+  }
+
+  async getSwapInAddress(options?: T.RequestOptions): Promise<T.SwapInAddress> {
+    return this.#http.request("GET", "getswapinaddress", {}, options);
+  }
+
+  async listChannels(
+    options?: T.RequestOptions,
+  ): Promise<T.ListChannelsResponse> {
+    return this.#http.request("GET", "listchannels", {}, options);
+  }
+
+  async decodeInvoice(
+    params: T.DecodeInvoiceParams,
+    options?: T.RequestOptions,
+  ): Promise<T.DecodedInvoice> {
+    return this.#http.request("POST", "decodeinvoice", params, options);
+  }
+
+  async decodeOffer(
+    params: T.DecodeOfferParams,
+    options?: T.RequestOptions,
+  ): Promise<T.DecodedOffer> {
+    return this.#http.request("POST", "decodeoffer", params, options);
+  }
+
+  async estimateLiquidityFees(
+    params: T.EstimateLiquidityFeesParams,
+    options?: T.RequestOptions,
+  ): Promise<T.LiquidityFeesEstimate> {
+    return this.#http.request("GET", "estimateliquidityfees", params, options);
+  }
+
+  async lnUrlPay(
+    params: T.LnUrlPayParams,
+    options?: T.RequestOptions,
+  ): Promise<T.PaymentResult> {
+    if (params.amountSat !== undefined && params.sendAll !== undefined)
+      throw new TypeError("amountSat and sendAll are mutually exclusive");
+
+    if (params.sendAll !== undefined && params.sendAll !== true)
+      throw new TypeError("sendAll must be true");
+
+    return this.#http.request("POST", "lnurlpay", params, options);
+  }
+
+  async lnUrlWithdraw(
+    params: T.LnUrlWithdrawParams,
+    options?: T.RequestOptions,
+  ): Promise<T.LnUrlWithdrawal> {
+    return this.#http.request("POST", "lnurlwithdraw", params, options);
+  }
+
+  async lnUrlAuth(
+    params: T.LnUrlAuthParams,
+    options?: T.RequestOptions,
+  ): Promise<string> {
+    return this.#http.request("POST", "lnurlauth", params, options, {
+      text: true,
+    });
+  }
+
+  async getIncomingPayment(
+    id: string,
+    options?: T.RequestOptions,
+  ): Promise<T.IncomingPayment | null> {
+    return this.#http.request(
+      "GET",
+      `payments/incoming/${encodeURIComponent(id)}`,
+      {},
+      options,
+      { missing: true },
+    );
+  }
+
+  async getOutgoingPayment(
+    id: string,
+    options?: T.RequestOptions,
+  ): Promise<T.OutgoingPayment | null> {
+    return this.#http.request(
+      "GET",
+      `payments/outgoing/${encodeURIComponent(id)}`,
+      {},
+      options,
+      { missing: true },
+    );
+  }
+
+  async getOutgoingPaymentByHash(
+    id: string,
+    options?: T.RequestOptions,
+  ): Promise<T.OutgoingPayment | null> {
+    return this.#http.request(
+      "GET",
+      `payments/outgoingbyhash/${encodeURIComponent(id)}`,
+      {},
+      options,
+      { missing: true },
+    );
+  }
+
+  subscribePayments(options: PaymentSubscriptionOptions): PaymentSubscription {
+    return subscribePayments(this.url, this.#password, options);
   }
 }

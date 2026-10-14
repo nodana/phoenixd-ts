@@ -1,15 +1,15 @@
 {
   "compilerOptions": {
-    "target": "es2020",
-    "module": "esnext",
-    "declaration": true,
-    "sourceMap": true,
-    "outDir": "dist",
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
     "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
     "esModuleInterop": true,
-    "moduleResolution": "node",
-    "resolveJsonModule": true
+    "skipLibCheck": true,
+    "declaration": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["tests/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }

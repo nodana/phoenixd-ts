@@ -1,128 +1,224 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { Phoenixd, HttpClientError, PhoenixdResponseError } from "../src";
 
-import { HttpClient, HttpClientError } from "../src/HttpClient";
+function client(response: Response, options = {}) {
+  const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(response);
 
-const NODE_URL = "https://nodeurl.com";
+  return {
+    node: new Phoenixd("https://node.example/api/", "pässword", {
+      fetch,
+      ...options,
+    }),
+    fetch,
+  };
+}
 
-describe("HttpClient", () => {
-  let http: HttpClient;
-  let fetchStub: ReturnType<typeof vi.fn>;
+describe("HTTP transport", () => {
+  it("authenticates and form-encodes Unicode without losing empty descriptions or zero values", async () => {
+    const { node, fetch } = client(
+      Response.json({ paymentHash: "hash", serialized: "invoice" }),
+    );
 
-  beforeEach(() => {
-    http = new HttpClient(NODE_URL, "password");
-    fetchStub = vi.fn();
-    fetchStub.mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: vi.fn().mockResolvedValue(JSON.stringify({ foo: "bar" })),
+    await node.createInvoice({
+      description: "",
+      amountSat: 0,
+      externalId: "order + café",
+      expirySeconds: 1,
     });
-    vi.stubGlobal("fetch", fetchStub);
-  });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
-  });
+    const [url, init] = fetch.mock.calls[0]!;
 
-  it("should make GET request", async () => {
-    const response = await http.get("/path");
-
-    expect(fetchStub).toHaveBeenCalledWith(`${NODE_URL}/path`, {
-      method: "GET",
-      headers: {
-        Authorization: "Basic OnBhc3N3b3Jk",
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
+    expect(url).toBe("https://node.example/api/createinvoice");
+    expect(init?.headers).toMatchObject({
+      Authorization: "Basic OnDDpHNzd29yZA==",
+      "Content-Type": "application/x-www-form-urlencoded",
     });
-    expect(response).toEqual({ foo: "bar" });
+    expect(new URLSearchParams(String(init?.body)).get("description")).toBe("");
+    expect(new URLSearchParams(String(init?.body)).get("externalId")).toBe(
+      "order + café",
+    );
+    expect(new URLSearchParams(String(init?.body)).get("amountSat")).toBe("0");
+    expect(init?.redirect).toBe("error");
   });
 
-  it("should encode non-ascii passwords in the auth header", async () => {
-    http = new HttpClient(NODE_URL, "pässword");
-    vi.stubGlobal("fetch", fetchStub);
+  it("sends export date filters as query parameters with no form body", async () => {
+    const { node, fetch } = client(Response.json("exported"));
 
-    await http.get("/path");
+    expect(await node.exportPayments({ from: new Date(1000), to: 2000 })).toBe(
+      "exported",
+    );
+    expect(fetch.mock.calls[0]![0]).toBe(
+      "https://node.example/api/export?from=1000&to=2000",
+    );
+    expect(fetch.mock.calls[0]![1]?.body).toBeUndefined();
+  });
 
-    expect(fetchStub).toHaveBeenCalledWith(`${NODE_URL}/path`, {
-      method: "GET",
-      headers: {
-        Authorization: "Basic OnDDpHNzd29yZA==",
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
+  it.each([204, 404])(
+    "returns null for missing payment lookup (%i)",
+    async (status) => {
+      const { node } = client(new Response(null, { status }));
+
+      expect(await node.getIncomingPayment("a".repeat(64))).toBeNull();
+    },
+  );
+
+  it("keeps non-lookup 404 errors actionable", async () => {
+    const { node } = client(
+      new Response("Unknown endpoint", {
+        status: 404,
+        statusText: "Not Found",
+      }),
+    );
+
+    await expect(node.getOffer()).rejects.toMatchObject({
+      name: "HttpClientError",
+      status: 404,
+      body: "Unknown endpoint",
     });
   });
 
-  it("should make POST request", async () => {
-    const body = {
-      payload: "test-payload",
-      at: new Date(1000),
-      unset: undefined,
-      empty: null,
+  it("exports HTTP errors without including a response body in the message", async () => {
+    const { node } = client(
+      new Response("sensitive detail", {
+        status: 401,
+        statusText: "Unauthorized",
+      }),
+    );
+
+    try {
+      await node.getInfo();
+
+      throw new Error("Expected failure");
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpClientError);
+      expect((error as HttpClientError).body).toBe("sensitive detail");
+      expect((error as Error).message).not.toContain("sensitive detail");
+    }
+  });
+
+  it("rejects malformed JSON instead of silently returning text", async () => {
+    const { node } = client(new Response("<html>proxy error</html>"));
+
+    await expect(node.getBalance()).rejects.toBeInstanceOf(
+      PhoenixdResponseError,
+    );
+  });
+
+  it.each([
+    new Response("transaction not confirmed"),
+    Response.json("transaction not confirmed"),
+  ])("preserves textual business results", async (response) => {
+    const { node } = client(response);
+
+    expect(await node.bumpFee({ feerateSatByte: 5 })).toBe(
+      "transaction not confirmed",
+    );
+  });
+
+  it("returns the HTTP 200 payment failure as a discriminated result", async () => {
+    const result = { type: "payment_failed", reason: "Insufficient balance" };
+    const { node, fetch } = client(Response.json(result));
+
+    expect(await node.payInvoice({ invoice: "lnbc..." })).toEqual(result);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a failed payment request", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockRejectedValue(new TypeError("Network failure"));
+    const node = new Phoenixd("http://localhost:9740", "password", { fetch });
+
+    await expect(node.payInvoice({ invoice: "lnbc..." })).rejects.toThrow(
+      "Network failure",
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("honours both default and per-request abort signals", async () => {
+    const defaults = new AbortController();
+    const request = new AbortController();
+
+    const fetch: typeof globalThis.fetch = async (_url, init) => {
+      const signal = init!.signal!;
+
+      return new Promise((_resolve, reject) => {
+        if (signal.aborted) reject(signal.reason);
+        else
+          signal.addEventListener("abort", () => reject(signal.reason), {
+            once: true,
+          });
+      });
     };
 
-    await http.post("/path", body);
-
-    expect(fetchStub).toHaveBeenCalledWith(`${NODE_URL}/path`, {
-      method: "POST",
-      headers: {
-        Authorization: "Basic OnBhc3N3b3Jk",
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: "payload=test-payload&at=1000",
+    const node = new Phoenixd("http://localhost:9740", "password", {
+      fetch,
+      signal: defaults.signal,
     });
+    const pending = node.getInfo({ signal: request.signal });
+
+    request.abort(new Error("Cancelled request"));
+    await expect(pending).rejects.toThrow("Cancelled request");
+    defaults.abort(new Error("Closed client"));
+    await expect(node.getInfo()).rejects.toThrow("Closed client");
   });
 
-  it("should parse plain text responses", async () => {
-    fetchStub.mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: vi.fn().mockResolvedValue("plain response"),
-    });
-
-    const response = await http.get("/path");
-
-    expect(response).toBe("plain response");
-  });
-
-  it("should include response details in failed requests", async () => {
-    fetchStub.mockResolvedValue({
-      ok: false,
-      status: 400,
-      statusText: "Bad Request",
-      text: vi.fn().mockResolvedValue("invalid invoice"),
-    });
+  it("applies deadlines until the response body is read and allows disabling them per request", async () => {
+    vi.useFakeTimers();
 
     try {
-      await http.get("/path");
-      throw new Error("Expected request to fail");
-    } catch (error: any) {
-      expect(error).toBeInstanceOf(HttpClientError);
-      expect(error.message).toBe(
-        "Request failed with status 400: invalid invoice"
+      const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(
+        async (_url, init) =>
+          ({
+            ok: true,
+            status: 200,
+            text: () =>
+              new Promise((_resolve, reject) =>
+                init!.signal!.addEventListener("abort", () =>
+                  reject(init!.signal!.reason),
+                ),
+              ),
+          }) as Response,
       );
-      expect(error.status).toBe(400);
-      expect(error.statusText).toBe("Bad Request");
-      expect(error.body).toBe("invalid invoice");
+      const node = new Phoenixd("http://localhost:9740", "password", {
+        fetch,
+        timeoutMs: 100,
+      });
+      const pending = expect(node.getBalance()).rejects.toMatchObject({
+        name: "TimeoutError",
+      });
+
+      await vi.advanceTimersByTimeAsync(100);
+      await pending;
+      fetch.mockResolvedValueOnce(
+        Response.json({ balanceSat: 0, feeCreditSat: 0 }),
+      );
+      await node.getBalance({ timeoutMs: 0 });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
     }
   });
 
-  it("should fall back to status text for failed requests without a body", async () => {
-    fetchStub.mockResolvedValue({
-      ok: false,
-      status: 500,
-      statusText: "Internal Server Error",
-      text: vi.fn().mockResolvedValue(""),
-    });
+  it.each([
+    "ftp://example.com",
+    "https://user:secret@example.com",
+    "https://example.com?x=1",
+    "https://example.com/#fragment",
+  ])("rejects unsafe base URL %s", (url) => {
+    expect(() => new Phoenixd(url, "password")).toThrow(TypeError);
+  });
 
-    try {
-      await http.get("/path");
-      throw new Error("Expected request to fail");
-    } catch (error: any) {
-      expect(error).toBeInstanceOf(HttpClientError);
-      expect(error.message).toBe(
-        "Request failed with status 500: Internal Server Error"
-      );
-      expect(error.body).toBe("");
-    }
+  it("rejects invalid deadlines and dates", async () => {
+    expect(
+      () => new Phoenixd("http://localhost", "password", { timeoutMs: -1 }),
+    ).toThrow(TypeError);
+
+    const { node, fetch } = client(Response.json([]));
+
+    await expect(
+      node.listIncomingPayments({ from: new Date("invalid") }),
+    ).rejects.toThrow("from must be finite");
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
